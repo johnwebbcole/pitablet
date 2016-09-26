@@ -1,0 +1,24 @@
+{
+  "name": "pitablet",
+  "version": "1.0.0",
+  "description": "RaspberryPi case for pi and 7 inch screen",
+  "main": "main.jscad",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "John Cole",
+  "license": "ISC",
+  "dependencies": {
+    "jscad-utils": "^2.0.0"
+  },
+  "devDependencies": {
+    "del": "^2.2.0",
+    "gulp": "^3.9.1",
+    "gulp-inject": "^3.0.0",
+    "gulp-jscad-files": "^1.0.0",
+    "gulp-load-plugins": "^1.2.0",
+    "gulp-merge": "^0.1.1",
+    "gulp-plumber": "^1.1.0",
+    "gulp-watch": "^4.3.5"
+  }
+}
