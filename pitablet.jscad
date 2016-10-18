@@ -3,17 +3,356 @@
 // license    : ISC License
 // file       : pitablet.jscad
 
-/* exported main, getParameterDefinitions */
+/* exported main, getParameterDefinitions, RaspberryPi, Boxes */
+
+function PiTablet(part) {
+    var unitCube = util.unitCube();
+
+    var outside = Parts.Cube([164.9, 100, 3.4])
+        .align(unitCube, 'xy')
+        .color('orange');
+
+    // var bezel2 = Parts.Cube([156.7, 89.1, 1.8])
+    //     .snap(outside, 'z', 'outside-')
+    //     .snap(outside, 'xy', 'inside+')
+    //     .translate([-5.49, -3.57, 0])
+    //     .color('green');
+
+    var bezel = Parts.Cube([161.5, 96.5, 1.8])
+        .snap(outside, 'z', 'outside-')
+        .snap(outside, 'xy', 'inside+')
+        .translate([-2.5, -1, 0])
+        .color('green');
+
+    var lcd = Parts.Cube([154.08, 85.92, 1.81])
+        .snap(outside, 'z', 'outside-')
+        .snap(outside, 'xy', 'inside+')
+        .translate([-6.9, -4.78, 0])
+        .color('black');
+
+    var thickness = 2;
+    var depth = 15;
+
+    // var boxsize = outside.enlarge(20, 15, 0).size();
+    var boxsize = outside.size().plus(new CSG.Vector3D(20, 15, 0)).dividedBy(2);
+
+    var box = util.group();
+
+    box.add(CSG.cube({
+        radius: [boxsize.x, boxsize.y, depth / 2]
+    }), 'outline', true);
+
+    var board = CAG.roundedRectangle({
+        center: [boxsize.x, boxsize.y, 0],
+        radius: [boxsize.x, boxsize.y],
+        roundradius: 5
+    });
+
+    box.add(util.poly2solid(board, util.enlarge(board, [-5, -5]), depth)
+        .align(box.parts.outline, 'xyz'), 'tapered', true);
+
+    box.add(box.parts.outline.enlarge([50, 50, 0]).subtract(box.parts.tapered), 'exterior', true);
+
+    box.add(Boxes.Hollow(box.parts.tapered, thickness, function (inside) {
+            return inside.bisect('z', 2).parts.positive;
+        })
+        .align(outside, 'xy')
+        .snap(bezel, 'z', 'inside+')
+        .translate([0, 0, thickness])
+        .color('gray'), 'hollow', true);
+
+    box.add(Boxes.RabettTopBottom(box.parts.hollow, thickness, 0.25, {
+        removableTop: true,
+        removableBottom: false
+    }));
+
+    var lcdcutout = lcd.enlarge([0, 0, thickness - lcd.size().z])
+        .snap(bezel, 'z', 'outside-')
+        .chamfer(-thickness + 0.001, 'z+');
+
+    var screw = Parts.Hardware.FlatHeadScrew(5.38, 1.7, 2.84, 12.7 - 1.7).combine('head,thread').rotateX(180);
+
+    function corners(o, to, orientation, x, y) {
+        x = x || 0;
+        y = y || 0;
+        return util.group('one,two,three,four', [
+            o.snap(to, 'x', orientation + '+').snap(to, 'y', orientation + '+').translate([x, y, 0]),
+            o.snap(to, 'x', orientation + '+').snap(to, 'y', orientation + '-').translate([x, -y, 0]),
+            o.snap(to, 'x', orientation + '-').snap(to, 'y', orientation + '-').translate([-x, -y, 0]),
+            o.snap(to, 'x', orientation + '-').snap(to, 'y', orientation + '+').translate([-x, y, 0])
+        ]);
+    }
+
+    var top = box.parts.top.subtract(
+        union([
+            lcdcutout,
+            outside,
+            bezel
+        ])
+    );
+
+    function createRibs(object, axis) {
+        var otheraxis = 'xy'.replace(axis, '');
+        var size = util.axisApply(axis, function () {
+            return object.size()[axis];
+        }, [1, 1, 1]);
+        var rib = Parts.Cube(size)
+            .align(object, axis)
+            .snap(object, otheraxis, 'inside-')
+            .snap(object, 'z', 'inside-')
+            .translate([0, 0, thickness])
+            .fillet(-0.9, 'z-');
+
+        var ribs = union(util.segment(object, 10, otheraxis).map(function (position) {
+            return rib.translate(util.axisApply(otheraxis, function () {
+                return position;
+            }));
+        }));
+        return ribs;
+    }
+
+    box.add(union([createRibs(box.parts.bottom, 'x'), createRibs(box.parts.bottom, 'y')]).color('darkgray'), 'ribs');
+
+    var screensupport = box.parts.top
+        .enlarge([-thickness, -thickness, 0])
+        .snap(top, 'z', 'outside+')
+        .subtract(
+            union([
+                outside,
+                bezel
+            ]).enlarge([1, 1, 0])
+        )
+        .color('red');
+
+    var supports = corners(Parts.Cylinder(40, depth - (thickness * 3))
+            .snap(screensupport, 'z', 'outside+'),
+            screensupport, 'inside', 20, 20)
+        .map(function (part) {
+            return part.fillet(-1, 'z-').color('green');
+        });
+
+
+    var screws = corners(Parts.Cylinder(10, 1), screensupport, 'inside')
+        .map(function (part) {
+            return screw.align(part, 'xy').snap(box.parts.top, 'z', 'inside+');
+        });
+
+    var BPlus = RaspberryPi.BPlus();
+
+    BPlus.add(RaspberryPi.BPlusMounting.holes(BPlus.parts.mb, {
+        height: 70,
+        diameter: 3.05 // 2.75 clearance for M2.5 screw http://www.littlemachineshop.com/reference/tapdrillsizes.pdf
+    }), 'holes', true);
+
+    BPlus.add(RaspberryPi.Parts.UsbWifiAdapter(BPlus.parts.usb2, 0).enlarge([1, 1, 1]), 'usb20Clearance', true);
+    BPlus.add(RaspberryPi.Parts.UsbWifiAdapter(BPlus.parts.usb2, 1).enlarge([1, 1, 1]), 'usb21Clearance', true);
+    BPlus.add(RaspberryPi.Parts.UsbWifiAdapter(BPlus.parts.usb1, 0).enlarge([1, 1, 1]), 'usb10Clearance', true);
+    BPlus.add(RaspberryPi.Parts.UsbWifiAdapter(BPlus.parts.usb1, 1).enlarge([1, 1, 1]), 'usb11Clearance', true);
+    BPlus.add(BPlus.parts.ethernet.color('blue').snap(BPlus.parts.ethernet, 'x', 'outside-'), 'ethernetClearance', true);
+
+    // console.log('BPlus', BPlus.parts)
+    var Pads = RaspberryPi.BPlusMounting.pads(BPlus.parts.mb, {
+        height: 9
+    });
+
+    var Hat = RaspberryPi.Hat().snap('mb', Pads.parts.pad1, 'z', 'outside-');
+
+    Hat.add(
+        RaspberryPi.Parts.MicroUsb()
+        .snap(Hat.parts.mb, 'y', 'inside-')
+        .snap(Hat.parts.mb, 'z', 'outside+')
+        .midlineTo('x', 52.71), 'touchusb');
+
+    BPlus.add(RaspberryPi.BPlusMounting.pads(BPlus.parts.mb, {
+            height: 2
+        }).map(function (part) {
+            return part.fillet(-1, 'z-');
+        })
+        .snap('pad1', BPlus.parts.mb, 'z', 'outside+'), 'mount', false, 'mount');
+
+    BPlus.add(Hat, 'hat', false, 'hat');
+    BPlus.add(RaspberryPi.BPlusMounting.pads(BPlus.parts.hatmb, {
+            height: 4
+        })
+        .snap('pad1', BPlus.parts.hatmb, 'z', 'outside-')
+        .map(function (part) {
+            return part.fillet(-3.5, 'z+');
+        }), 'hatsupports');
+
+    BPlus.add(RaspberryPi.Parts.MicroUsbPlug(BPlus.parts.microusb), 'powerplug', true);
+    BPlus.add(RaspberryPi.Parts.MicroUsbPlug(BPlus.parts.hattouchusb), 'touchusbplug', true);
+
+    BPlus = BPlus.rotate(outside, 'y', 180);
+
+    var pos = util.array.add(
+        BPlus.parts.mb.calcSnap(box.parts.bottom, 'z', 'outside+'),
+        BPlus.parts.mb.calcSnap(box.parts.bottom, 'x', 'inside-'),
+        BPlus.parts.mb.calcSnap(box.parts.bottom, 'y', 'inside+'), [30, -10, 0]);
+
+    BPlus = BPlus
+        .map(function (part) {
+            return part
+                .translate(pos);
+        });
+
+    var leftcutouts = BPlus.combine('ethernet,usb1,usb2', {}, function (part) {
+            return part.enlarge([1, 1, 1]);
+        })
+        .union(BPlus.combine('usb1flange,usb2flange').enlarge(2, 1, 1))
+        .union(BPlus.combine('ethernetClearance,usb10Clearance,usb11Clearance,usb20Clearance,usb21Clearance'));
+
+    // console.log('BPlus', BPlus);
+    var bottomcutouts = union(BPlus.combine('powerplug,touchusbplug', {}, function (part) {
+        return part.enlarge([2, 2, 2]).translate([0, thickness, -1]);
+    }));
+
+    // var interior = BPlus.combine('mb,ethernet,avjack,microsd,hatsupports');
+    var interior = BPlus.combine('mb,avjack,microsd,hatsupports');
+    var pisize = interior.enlarge([5, 5, 0]).size();
+    // console.log('pisize', pisize);
+    var pioutline = Parts.Board(pisize.x, pisize.y, 5, pisize.z + (thickness * 2))
+        .color('purple', 0.25);
+
+
+    var pibox = Boxes.Hollow(pioutline, thickness);
+
+    var picase = Boxes.Rabett(pibox, thickness, 1, -thickness, 0)
+        .snap('bottom', box.parts.bottom, 'z', 'outside+', thickness)
+        .align('bottom', interior, 'xy');
+
+    pioutline = pioutline.snap(picase.parts.bottom, 'z', 'inside-')
+        .align(interior, 'xy');
+
+    var picase_seat = box.parts.bottom.intersect(picase.parts.bottom)
+        .enlarge([thickness, thickness, 2])
+        .snap(box.parts.bottom, 'z', 'inside-');
+
+    var gusset = Parts.Board(10, pisize.y + 15, 4, thickness)
+        .snap(box.parts.bottom, 'z', 'inside-', thickness)
+        .align(pioutline, 'y')
+        .color('red');
+    var pad = Parts.Cylinder(10, 2).snap(box.parts.bottom, 'z', 'inside-', thickness);
+
+    var pimount = util.group();
+    pimount.add(gusset.align(BPlus.parts.mountpad1, 'x'), 'gusset1');
+    pimount.add(gusset.align(BPlus.parts.mountpad2, 'x'), 'gusset2');
+    pimount.add(BPlus.parts.mount.snap(gusset, 'z', 'outside+'), 'pads');
+    pimount.add(pad
+        .align(pimount.parts.gusset1, 'x')
+        .snap(pimount.parts.gusset1, 'y', 'inside+')
+        .fillet(-1.75, 'z-'), 'mount1');
+    pimount.add(pad
+        .align(pimount.parts.gusset1, 'x')
+        .snap(pimount.parts.gusset1, 'y', 'inside-')
+        .fillet(-1.75, 'z-'), 'mount2');
+    pimount.add(pad
+        .align(pimount.parts.gusset2, 'x')
+        .snap(pimount.parts.gusset2, 'y', 'inside+')
+        .fillet(-1.75, 'z-'), 'mount3');
+    pimount.add(pad
+        .align(pimount.parts.gusset2, 'x')
+        .snap(pimount.parts.gusset2, 'y', 'inside-')
+        .fillet(-1.75, 'z-'), 'mount4');
+
+    var nut = Parts.Hexagon(5.5, 1.5).enlarge([0.5, 0.5, 0]).color('gray');
+
+    pimount.add(BPlus.pick('mountpad1,mountpad2,mountpad3,mountpad4', function (part) {
+        return nut
+            .align(part, 'xy')
+            .snap(gusset, 'z', 'inside+');
+    }), 'nuts', true);
+
+
+    var m2_5screw = Parts.Hardware.PanHeadScrew(4.5, 2.5, 2.5, 19, 6)
+        .combine('head,thread,headClearSpace')
+        .enlarge([0.5, 0.5, 0])
+        .snap(gusset, 'z', 'inside+');
+
+    pimount.add(BPlus.pick('mountpad1,mountpad2,mountpad3,mountpad4', function (part) {
+        return m2_5screw
+            .align(part, 'xy');
+    }), 'bolts', true);
+
+    // return pimount.combine().subtract(pimount.combine('nuts,bolts'));
+    var piBoardHoles = RaspberryPi.BPlusMounting.holes(
+        BPlus.parts.mb, {
+            height: 50,
+            diameter: 3.05 // 2.75 clearance for M2.5 screw http://www.littlemachineshop.com/reference/tapdrillsizes.pdf
+        });
+    var parts = {
+        top: function () {
+            return union([top, screensupport])
+                .subtract(screws.map(function (screw) {
+                    return screw.enlarge([0.42, 0.42, 0]);
+                }).combine());
+        },
+        bottom: function () {
+            return union([
+                    box.combine('bottom,ribs').union(
+                        supports.combine().subtract(outside.enlarge([1, 1, 1]))
+                    ).subtract(pioutline.enlarge([-thickness, -thickness, 10])),
+                    picase_seat.color('orange'),
+                    pimount.combine().subtract(pimount.combine('nuts,bolts'))
+                    // gussets.combine().subtract(nuts.combine())
+                ]).subtract(piBoardHoles.combine())
+                .subtract(screws.map(function (screw) {
+                    return screw.enlarge([-0.6, -0.6, 4]);
+                }).combine())
+                .subtract(box.parts.exterior.color('grey'));
+        },
+        picase: function () {
+            return union([
+                picase.combine('bottom')
+                .union(BPlus.combine('hatsupports'))
+                .subtract(
+                    union([
+                        leftcutouts,
+                        bottomcutouts,
+                        pimount.parts.bolts,
+                        BPlus.combine('holes')
+                    ]))
+                .color('lightblue')
+                // .union(BPlus.combine('usb1flange,usb2flange').enlarge(2, 1, 1))
+            ]);
+        },
+        assembled: function () {
+            return union([
+                // outside,
+                // bezel,
+                // lcd,
+                parts.top(),
+                // BPlus.combine(),
+                parts.bottom(),
+                parts.picase()
+            ]); //.rotateX(-82).Zero();
+        }
+    };
+
+    return parts[part]();
+}
 
 function getParameterDefinitions() {
+    var parts = {
+        picase: 'picase',
+        top: 'Top',
+        bottom: 'Bottom',
+        assembled: 'Assembled'
+    };
 
     return [{
         name: 'resolution',
         type: 'choice',
         values: [0, 1, 2, 3, 4],
         captions: ['very low (6,16)', 'low (8,24)', 'normal (12,32)', 'high (24,64)', 'very high (48,128)'],
-        initial: 2,
+        initial: 0,
         caption: 'Resolution:'
+    }, {
+        name: 'part',
+        type: 'choice',
+        values: _.keys(parts),
+        captions: _.values(parts),
+        initial: 'bottom',
+        caption: 'Part:'
     }];
 }
 
@@ -32,182 +371,7 @@ function main(params) {
     CSG.defaultResolution2D = resolutions[params.resolution][1];
     util.init(CSG);
 
-    var unitCube = util.unitCube();
-
-    var outside = Parts.Cube([164.9, 100, 3.4])
-        .align(unitCube, 'xy')
-        .color('orange');
-
-    var bezel2 = Parts.Cube([156.7, 89.1, 1.8])
-        .snap(outside, 'z', 'outside-')
-        .snap(outside, 'xy', 'inside+')
-        .translate([-5.49, -3.57, 0])
-        .color('green');
-
-    var bezel = Parts.Cube([161.5, 96.5, 1.8])
-        .snap(outside, 'z', 'outside-')
-        .snap(outside, 'xy', 'inside+')
-        .translate([-2.5, -1, 0])
-        .color('green');
-
-    var lcd = Parts.Cube([154.08, 85.92, 1.81])
-        .snap(outside, 'z', 'outside-')
-        .snap(outside, 'xy', 'inside+')
-        .translate([-6.9, -4.78, 0])
-        .color('black');
-
-    // var BPlus = RaspberryPi.BPlus();
-    //
-    // var Pads = RaspberryPi.BPlusMounting.pads(BPlus.parts.mb, {
-    //     height: 9
-    // });
-    //
-    // var Hat = RaspberryPi.Hat().snap('mb', Pads.parts.pad1, 'z', 'outside-');
-
-    // var Mount = RaspberryPi.BPlusMounting.pads(BPlus.parts.mb, {
-    //         height: 7
-    //     }).snap('pad1', Hat.parts.mb, 'z', 'outside-')
-    //     .map(function (part) {
-    //         return part.fillet(-2, 'z+');
-    //     });
-    //
-    var screw = Parts.Hardware.FlatHeadScrew(5.38, 1.7, 2.84, 12.7 - 1.7).combine('head,thread').rotateX(180);
-    //
-    // var piscrews = Mount.clone(function (part) {
-    //     return screw.rotateX(180).align(part, 'xy').snap(Hat.parts.mb, 'z', 'inside-');
-    // });
-
-    // console.log('piscrews', piscrews);
-
-    // BPlus.add(Hat, 'hat', false, 'hat');
-    // BPlus.add(Pads);
-    // // BPlus.add(Mount, 'mount', false, 'mount');
-    // // BPlus.add(piscrews, 'screws', true, 'screws');
-    //
-    // BPlus = BPlus.rotate(outside, 'x', 180);
-    //
-    // var pos = util.array.add(
-    //     BPlus.parts.mb.calcSnap(outside, 'z', 'outside+'),
-    //     BPlus.parts.mb.calcSnap(outside, 'x', 'inside+'),
-    //     BPlus.parts.mb.calcAlign(outside, 'y'), [0, 0, -5]);
-    //
-    // BPlus = BPlus
-    //     .map(function (part) {
-    //         return part
-    //             .translate(pos);
-    //     });
-
-    var thickness = 2;
-    // var depth = bezel.getBounds()[1].z - BPlus.parts.mount.getBounds()[0].z + (thickness * 2);
-    var depth = 15;
-    // console.log('diff', depth, BPlus.parts.mount.getBounds(), bezel.getBounds());
-
-    // console.log('BPlus', BPlus.parts);
-
-    var boxsize = outside.enlarge(20, 15, 0).size();
-
-    // console.log('boxsize', boxsize);
-    // var chamfer = thickness / 2;
-    var box = Boxes.Hollow(Parts.Board(boxsize.x, boxsize.y, 5, depth), thickness)
-        .align(outside, 'xy')
-        .snap(bezel, 'z', 'inside+')
-        .translate([0, 0, thickness])
-        .color('gray');
-    // var box = Boxes.Rectangle(boxsize, thickness, function (box) {
-    //     return box
-    //         .rotateY(90)
-    //         .chamfer(chamfer, 'z+')
-    //         .chamfer(chamfer, 'z-')
-    //         .rotateY(-90)
-    //         .chamfer(chamfer, 'z+')
-    //         .chamfer(chamfer, 'z-')
-    //         .align(outside, 'xyz');
-    // });
-
-    box = Boxes.RabetTopBottom(box, thickness, 0.3, {
-        removableTop: true,
-        removableBottom: true
-    });
-
-    // return box.combine('top,bottom')
-    var lcdcutout = lcd.enlarge([0, 0, thickness - lcd.size().z])
-        .snap(bezel, 'z', 'outside-')
-        .chamfer(-thickness + 0.001, 'z+');
-
-
-
-    function corners(bar, foo, orientation) {
-        return util.group('one,two,three,four', [
-            bar.snap(foo, 'xy', orientation + '+'),
-            bar.snap(foo, 'x', orientation + '+').snap(foo, 'y', orientation + '-'),
-            bar.snap(foo, 'xy', orientation + '-'),
-            bar.snap(foo, 'x', orientation + '-').snap(foo, 'y', orientation + '+')
-
-        ]);
-    }
-    // var supports = corners(Parts.Cylinder(10, depth - (thickness * 3))
-    //         .snap(screensupport, 'z', 'outside+'), screensupport, 'inside')
-    //     .map(function (part) {
-    //         return part.fillet(-1, 'z-');
-    //     });
-
-
-    // var screws = supports.clone(function (part) {
-    //     return screw.align(part, 'xy').snap(box.parts.top, 'z', 'inside+');
-    // });
-
-    // console.log('BPlus', BPlus);
-    // return BPlus.combine('screws');
-    var parts = {
-        top: function () {
-            var top = box.parts.top.subtract(
-                union([
-                    lcdcutout,
-                    outside,
-                    bezel
-                ])
-            );
-
-            // console.log('box', box);
-
-            var screensupport = box.parts.top
-                .enlarge([-thickness, -thickness, 0])
-                .snap(top, 'z', 'outside+')
-                .subtract(
-                    union([
-                        outside,
-                        bezel
-                    ]).enlarge([1, 1, 0])
-                )
-                .color('red');
-
-            return union([top, screensupport])
-                // .subtract(screws.map(function (screw) {
-                //     return screw.enlarge([0.42, 0.42, 0]);
-                // }).combine());
-        },
-        bottom: function () {
-            return union([
-                    supports.combine(),
-                    box.parts.bottom,
-                    BPlus.combine('mount')
-                ])
-                .subtract(
-                    union([screws.map(function (screw) {
-                            return screw.enlarge([-0.6, -0.6, 4]);
-                        }).combine(),
-                        outside.enlarge([1, 1, 1]),
-                        BPlus.combine('screwspad1,screwspad2,screwspad3,screwspad4', undefined, function (screw) {
-                            return screw.enlarge([-0.6, -0.6, 4]);
-                        })
-                    ]));
-        },
-        assembled: function () {
-            return union([outside, bezel, lcd, parts.top(), box.parts.bottom]);
-        }
-    }
-
-    return parts['assembled']();
+    return PiTablet(params.part);
 }
 
 // ********************************************************
