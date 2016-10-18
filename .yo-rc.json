@@ -1,0 +1,7 @@
+{
+  "generator-jscad": {
+    "name": "pitablet",
+    "description": "RaspberryPi case for pi and 7 inch screen",
+    "author": "John Cole"
+  }
+}
