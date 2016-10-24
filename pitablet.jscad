@@ -3,7 +3,7 @@
 // license    : ISC License
 // file       : pitablet.jscad
 
-/* exported main, getParameterDefinitions, RaspberryPi, Boxes */
+/* exported main, getParameterDefinitions, RaspberryPi, Boxes, _ */
 
 function PiTablet(part) {
     var unitCube = util.unitCube();
@@ -54,7 +54,6 @@ function PiTablet(part) {
         B: taperangle
     });
     var inset = -taper.b * 2;
-    console.log('taper inset', inset, taper);
     box.add(util.poly2solid(board, util.enlarge(board, [inset, inset]), depth)
         .align(box.parts.outline, 'xyz'), 'tapered', true);
 
@@ -191,8 +190,7 @@ function PiTablet(part) {
 
     var picaseheight = BPlus.combine('mb,usb1').size().z;
     var hatsupportheight = picaseheight - BPlus.combine('mb,hat').size().z;
-    console.log('hatsupportheight', hatsupportheight);
-    console.log('picaseheight', picaseheight);
+
     BPlus.add(RaspberryPi.BPlusMounting.pads(BPlus.parts.hatmb, {
             height: hatsupportheight - thickness
         })
@@ -210,9 +208,6 @@ function PiTablet(part) {
         a: picaseheight + depth,
         B: taperangle
     });
-
-    console.log('pioffset', pioffset, pioffset.a, taperangle, pioffset.b,
-        BPlus.combine('mb,hatsupports').size());
 
     var pos = util.array.add(
         BPlus.parts.mb.calcSnap(box.parts.bottom, 'z', 'outside+'),
@@ -261,28 +256,10 @@ function PiTablet(part) {
         .align(pioutline, 'y')
         .color('red');
 
-    var pad = Parts.Cylinder(10, thickness).snap(box.parts.bottom, 'z', 'inside-', thickness);
-
     var pimount = util.group();
     pimount.add(gusset.align(BPlus.parts.mountpad1, 'x'), 'gusset1');
     pimount.add(gusset.align(BPlus.parts.mountpad2, 'x'), 'gusset2');
     pimount.add(BPlus.parts.mount.snap(gusset, 'z', 'outside+'), 'pads');
-    // pimount.add(pad
-    //     .align(pimount.parts.gusset1, 'x')
-    //     .snap(pimount.parts.gusset1, 'y', 'inside+')
-    //     .fillet(-1.75, 'z-'), 'mount1');
-    // pimount.add(pad
-    //     .align(pimount.parts.gusset1, 'x')
-    //     .snap(pimount.parts.gusset1, 'y', 'inside-')
-    //     .fillet(-1.75, 'z-'), 'mount2');
-    // pimount.add(pad
-    //     .align(pimount.parts.gusset2, 'x')
-    //     .snap(pimount.parts.gusset2, 'y', 'inside+')
-    //     .fillet(-1.75, 'z-'), 'mount3');
-    // pimount.add(pad
-    //     .align(pimount.parts.gusset2, 'x')
-    //     .snap(pimount.parts.gusset2, 'y', 'inside-')
-    //     .fillet(-1.75, 'z-'), 'mount4');
 
     var nut = Parts.Hexagon(5.5, 1.5).enlarge([0.25, 0.25, 0]).color('gray');
 
@@ -303,7 +280,6 @@ function PiTablet(part) {
             .align(part, 'xy');
     }), 'bolts', true);
 
-    // return pimount.combine().subtract(pimount.combine('nuts,bolts'));
     var piBoardHoles = RaspberryPi.BPlusMounting.holes(
         BPlus.parts.mb, {
             height: 50,
@@ -319,9 +295,6 @@ function PiTablet(part) {
         bottom: function () {
             return union([
                     box.combine('bottom,supports')
-                    // .union(
-                    //     supports.combine().subtract(outside.enlarge([1, 1, 1]))
-                    // )
                     .subtract(outside.enlarge([0.75, 0.75, 0.75]))
                     .subtract(pioutline.enlarge([-thickness, -thickness, 10])),
                     picase_seat.color('orange'),
@@ -330,8 +303,7 @@ function PiTablet(part) {
                 ]).subtract(piBoardHoles.combine())
                 .subtract(screws.map(function (screw) {
                     return screw.enlarge([-0.6, -0.6, 2]);
-                }).combine())
-                // .subtract(box.parts.exterior.color('grey'));
+                }).combine());
         },
         picase: function () {
             return union([
@@ -350,18 +322,13 @@ function PiTablet(part) {
         },
         assembled: function () {
             return union([
-                // outside,
-                // bezel,
-                // lcd,
-                // parts.top(),
-                // picase_seat,
-                // BPlus.combine('mb,hatsupports,usb1,hat'),
+                outside,
+                bezel,
+                lcd,
+                parts.top().color('gray', 0.6),
                 BPlus.combine(),
-                parts.bottom(),
+                parts.bottom().color('gray', 0.6),
                 parts.picase(),
-                // picase.combine('top').color('blue', 0.4),
-                // pimount.parts.gusset2,
-                // Parts.Cube([1, 1, picaseheight]).snap(BPlus.parts.mb, 'z', 'inside+').align(pimount.parts.gusset2, 'xy')
             ]).rotateX(taperangle - 90).Zero();
         }
     };
