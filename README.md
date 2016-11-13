@@ -4,6 +4,48 @@
 
 ![Pi Tablet](images/hero3.jpg)
 
+# Why
+
+Awhile back, I purchased an Adafruit Kippah board and a 7 inch LCD touchscreen, intending to use the RPi as a 5v computer to run my telescope. This was before the [Pi Foundation Display](https://www.raspberrypi.org/products/raspberry-pi-touch-display/) was available.
+
+The screen worked great, but it didn't have any attachment tabs or a way of holding the RPi in place. Along with this problem, most of the software used with astrophotography was just being ported to the RPi, so I decided to shelve the project.
+
+In the meantime, I added a 3D printer to my list of hobbies and began learning [OpenJSCAD](http://openjscad.org). When several programs I use with my telescope became available for RPi, I decided to combine the two hobbies and make my RPi tablet.
+
+![It works!](images/hero-in-use.jpg)
+
+# Printing
+
+This project uses OpenJSCAD, [jscad-utils](https://github.com/johnwebbcole/jscad-utils) and [jscad-raspberrypi](https://github.com/johnwebbcole/jscad-raspberrypi).
+
+You can open the project directly in OpenJSCAD [here](http://openjscad.org/#https://raw.githubusercontent.com/johnwebbcole/pitablet/master/dist/pitablet.jscad)
+
+![front](images/jscad-assembled-front.jpg)
+
+![back](images/jscad-assembled-back.jpg)
+
+## Generate STL Files
+
+The three paramters on the left allow you to select:
+
+- The resolution used to created cylinders and rounded edges.
+- The angle of the taper on the edge of the tablet.
+- Which part to view, assembled, bottom, top or picase.
+
+When creating a STL file, set the resolution to the highest your system will allow. It can take a long time to render on the highest resolutions, but you will get a smoother object.
+
+The taper angle will move the picase as well as changing the angle of the tablet edges. This allows the picase to act as a kick stand. The default works pretty well. Angles greater than 22 degrees don't stand upright well.
+
+Select the part you want, then update. Then select the export type from the dropdown next to the `Generate STL` button, I use STL (ASCII), and press the Generate button.
+
+Load the STL into your slicer. You may need to rotate the part to print well.
+
+![Printed bottom](images/bp-back.jpg) The `bottom` should be printed with supports.
+
+![Printed picase](images/bp-picase-flat.jpg) The `top` and `picase` can be printed without supports.
+
+![Printed assembled](images/bp-assembled.jpg) All three parts after printing and cleaning. I printed these using ESun PETG.
+
 ## Parts
 
 - [Adafruit Kippah](https://www.adafruit.com/products/2453)
@@ -15,8 +57,6 @@
 - 4 M2.5x20mm screws
 - 4 M2.5x4mm or M2.5x6mm screws
 - 4 M2.5 nuts
-
-![front](front.png) ![back](back.png)
 
 ## Load OS
 
