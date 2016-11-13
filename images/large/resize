@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# resize large images for use in README.md
+
+# reqires `imagemagic`
+find . -name "*.jpg" | xargs -I % convert % -resize 640x480 ../%

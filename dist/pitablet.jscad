@@ -5,7 +5,7 @@
 
 /* exported main, getParameterDefinitions, RaspberryPi, Boxes, _ */
 
-function PiTablet(part) {
+function PiTablet(params) {
     var unitCube = util.unitCube();
 
     var outside = Parts.Cube([164.9, 100, 3.4])
@@ -48,7 +48,7 @@ function PiTablet(part) {
         roundradius: 5
     });
 
-    var taperangle = 15;
+    var taperangle = params.taperangle;
     var taper = util.triangle.solve90SA({
         a: depth,
         B: taperangle
@@ -333,7 +333,7 @@ function PiTablet(part) {
         }
     };
 
-    return parts[part]();
+    return parts[params.part]();
 }
 
 function getParameterDefinitions() {
@@ -351,6 +351,11 @@ function getParameterDefinitions() {
         captions: ['very low (6,16)', 'low (8,24)', 'normal (12,32)', 'high (24,64)', 'very high (48,128)'],
         initial: 0,
         caption: 'Resolution:'
+    }, {
+        name: 'taperangle',
+        type: 'number',
+        initial: 15,
+        caption: 'Taper Angle:'
     }, {
         name: 'part',
         type: 'choice',
@@ -376,7 +381,7 @@ function main(params) {
     CSG.defaultResolution2D = resolutions[params.resolution][1];
     util.init(CSG);
 
-    return PiTablet(params.part);
+    return PiTablet(params);
 }
 
 // ********************************************************
