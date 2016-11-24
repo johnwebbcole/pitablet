@@ -212,7 +212,7 @@ function PiTablet(params) {
     var pos = util.array.add(
         BPlus.parts.mb.calcSnap(box.parts.bottom, 'z', 'outside+'),
         BPlus.parts.mb.calcSnap(box.parts.bottom, 'x', 'inside-'),
-        BPlus.parts.mb.calcSnap(box.parts.bottom, 'y', 'inside+'), [30, -pioffset.b - (2), 0]);
+        BPlus.parts.mb.calcSnap(box.parts.bottom, 'y', 'inside+'), [params.picaseinset, -pioffset.b - (2), 0]);
 
     BPlus = BPlus
         .map(function (part) {
@@ -356,6 +356,11 @@ function getParameterDefinitions() {
         type: 'number',
         initial: 15,
         caption: 'Taper Angle:'
+    }, {
+        name: 'picaseinset',
+        type: 'number',
+        initial: 30,
+        caption: 'Picase Inset:'
     }, {
         name: 'part',
         type: 'choice',
